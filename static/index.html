@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Désactivateur</title>
+  <meta name="description" content="Désactivateur Wi-Fi local — contrôlez votre connexion sans fil depuis le navigateur." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080a0f;
+      --surface:   #0f1117;
+      --card:      #141820;
+      --border:    rgba(255,255,255,0.07);
+      --text:      #e6e8f0;
+      --muted:     #5c6270;
+
+      --on-h:      148deg;
+      --on-s:      65%;
+      --on-l:      44%;
+      --on:        hsl(var(--on-h), var(--on-s), var(--on-l));
+      --on-ring:   hsl(var(--on-h), var(--on-s), 62%);
+      --on-glow:   hsla(var(--on-h), var(--on-s), var(--on-l), 0.22);
+
+      --off-h:     4deg;
+      --off-s:     72%;
+      --off-l:     52%;
+      --off:       hsl(var(--off-h), var(--off-s), var(--off-l));
+      --off-ring:  hsl(var(--off-h), var(--off-s), 68%);
+      --off-glow:  hsla(var(--off-h), var(--off-s), var(--off-l), 0.22);
+
+      --warn:      hsl(38, 90%, 56%);
+
+      --radius:    22px;
+      --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+      --dur:        0.38s;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ── Ambient background ───────────────────────── */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.18;
+      z-index: 0;
+      pointer-events: none;
+      transition: background var(--dur) var(--ease);
+    }
+    body::before {
+      width: 55vw; height: 55vw;
+      top: -18%; left: -10%;
+      background: hsl(220, 70%, 40%);
+      animation: drift1 22s ease-in-out infinite alternate;
+    }
+    body::after {
+      width: 45vw; height: 45vw;
+      bottom: -14%; right: -8%;
+      background: hsl(265, 55%, 38%);
+      animation: drift2 28s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 { from { transform: translate(0,0); } to { transform: translate(4%, -5%); } }
+    @keyframes drift2 { from { transform: translate(0,0); } to { transform: translate(-4%, 4%); } }
+
+    /* ── Card ─────────────────────────────────────── */
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 38px 60px 44px;
+      width: 420px;
+      text-align: center;
+      backdrop-filter: blur(24px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.025),
+        0 32px 80px rgba(0,0,0,0.65),
+        0 8px 24px  rgba(0,0,0,0.45);
+    }
+
+    /* ── Heading ──────────────────────────────────── */
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #e6e8f0 30%, #8891a8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin-bottom: 38px;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Status pill ──────────────────────────────── */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 20px;
+      border-radius: 100px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 32px;
+      transition:
+        border-color var(--dur) var(--ease),
+        background   var(--dur) var(--ease);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    }
+    .status-text {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color var(--dur) var(--ease);
+    }
+
+    /* ── State-driven overrides ───────────────────── */
+    body.state-on  .status-dot  { background: var(--on);  box-shadow: 0 0 10px var(--on-ring); }
+    body.state-on  .status-text { color: var(--on); }
+
+    body.state-off .status-dot  { background: var(--off); box-shadow: 0 0 10px var(--off-ring); }
+    body.state-off .status-text { color: var(--off); }
+
+    /* ── Buttons ──────────────────────────────────── */
+    .btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 15px 36px;
+      border: none;
+      border-radius: 13px;
+      font-size: 0.97rem;
+      font-weight: 600;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      overflow: hidden;
+      transition:
+        box-shadow var(--dur) var(--ease),
+        transform  0.14s ease,
+        opacity    0.2s;
+    }
+    .btn + .btn { margin-top: 12px; }
+    .btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 0.18s;
+    }
+    .btn:hover::after  { background: rgba(255,255,255,0.07); }
+    .btn:active        { transform: scale(0.97); }
+    .btn:focus-visible { outline: 2px solid rgba(255,255,255,0.35); outline-offset: 3px; }
+    .btn:disabled      { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+    #btn-desactiver {
+      background: linear-gradient(135deg, hsl(4,72%,48%) 0%, hsl(355,68%,43%) 100%);
+      color: #fff;
+      box-shadow: 0 8px 28px hsla(4,72%,42%,0.38), 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #btn-desactiver:not(:disabled):hover {
+      box-shadow: 0 14px 36px hsla(4,72%,42%,0.54), 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    #btn-activer {
+      background: linear-gradient(135deg, hsl(148,65%,38%) 0%, hsl(158,60%,33%) 100%);
+      color: #fff;
+      box-shadow: 0 8px 28px hsla(148,65%,34%,0.38), 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #btn-activer:not(:disabled):hover {
+      box-shadow: 0 14px 36px hsla(148,65%,34%,0.54), 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* ── Spinner ──────────────────────────────────── */
+    .spinner {
+      display: none;
+      width: 17px; height: 17px;
+      border: 2.5px solid rgba(255,255,255,0.28);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ──────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 30px 0 18px;
+    }
+
+    /* ── Footer ───────────────────────────────────── */
+    .footer {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .footer code {
+      background: var(--surface);
+      padding: 1px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      color: #9ba3b8;
+      font-size: 0.70rem;
+    }
+
+    /* ── Ripple ───────────────────────────────────── */
+    @keyframes ripple {
+      from { transform: scale(0); opacity: 0.42; }
+      to   { transform: scale(4.5); opacity: 0; }
+    }
+    .ripple-el {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.28);
+      width: 70px; height: 70px;
+      margin: -35px 0 0 -35px;
+      animation: ripple 0.55s ease-out;
+      pointer-events: none;
+    }
+
+    /* ── Toast ────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%) translateY(90px);
+      background: #1c202c;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 100px;
+      padding: 11px 24px;
+      font-size: 0.81rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.55);
+      z-index: 200;
+      transition:
+        transform 0.42s cubic-bezier(0.34,1.56,0.64,1),
+        opacity   0.32s ease;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.success .t-icon { color: var(--on); }
+    #toast.error   .t-icon { color: var(--off); }
+    #toast.warn    .t-icon { color: var(--warn); }
+  </style>
+</head>
+<body class="state-unknown">
+
+  <div class="card" role="main">
+
+    <h1>Désactivateur</h1>
+    <p class="subtitle">Contrôlez votre connexion sans fil</p>
+
+    <!-- Status pill -->
+    <div class="status-pill" aria-live="polite">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">Vérification…</span>
+    </div>
+
+    <!-- Désactiver -->
+    <button id="btn-desactiver" class="btn"
+            onclick="handleAction('disable', this)"
+            aria-label="Désactiver le Wi-Fi">
+      <div class="spinner" id="spin-disable" aria-hidden="true"></div>
+      <!-- slash-wifi icon -->
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <circle cx="12" cy="20" r="1" fill="currentColor"/>
+      </svg>
+      Désactiver
+    </button>
+
+    <!-- Activer -->
+    <button id="btn-activer" class="btn"
+            onclick="handleAction('enable', this)"
+            aria-label="Activer le Wi-Fi">
+      <div class="spinner" id="spin-enable" aria-hidden="true"></div>
+      <!-- wifi icon -->
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <circle cx="12" cy="20" r="1" fill="currentColor"/>
+      </svg>
+      Activer
+    </button>
+
+    <hr class="divider" />
+
+    <p class="footer">
+      Serveur local &nbsp;<code>localhost:5000</code>&nbsp; · &nbsp;Windows <code>netsh</code>
+    </p>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" role="alert" aria-atomic="true">
+    <span class="t-icon" id="t-icon"></span>
+    <span id="t-msg"></span>
+  </div>
+
+  <script>
+    /* ── State ─────────────────────────────────────────────── */
+    let toastTimer = null;
+
+    /* ── Boot ──────────────────────────────────────────────── */
+    fetchStatus();
+    setInterval(fetchStatus, 8000);
+
+    /* ── Status ────────────────────────────────────────────── */
+    async function fetchStatus() {
+      try {
+        const { enabled } = await fetch('/api/status').then(r => r.json());
+        applyState(enabled);
+      } catch { /* silently ignore */ }
+    }
+
+    function applyState(enabled) {
+      document.body.classList.remove('state-on', 'state-off', 'state-unknown');
+      const txt = document.getElementById('status-text');
+      if (enabled === true) {
+        document.body.classList.add('state-on');
+        txt.textContent = 'Connecté';
+      } else if (enabled === false) {
+        document.body.classList.add('state-off');
+        txt.textContent = 'Désactivé';
+      } else {
+        txt.textContent = 'Inconnu';
+      }
+    }
+
+    /* ── Action ────────────────────────────────────────────── */
+    async function handleAction(action, btnEl) {
+      addRipple(btnEl, event);
+
+      const btns      = document.querySelectorAll('.btn');
+      const spinnerId = action === 'disable' ? 'spin-disable' : 'spin-enable';
+      const spinner   = document.getElementById(spinnerId);
+
+      btns.forEach(b => b.disabled = true);
+      spinner.style.display = 'block';
+
+      try {
+        const res  = await fetch(`/api/${action}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          applyState(action === 'enable');
+          showToast('✓ ' + data.message, 'success');
+        } else {
+          showToast('✗ ' + (data.message || 'Commande échouée. Lancez en Administrateur ?'), 'error');
+        }
+      } catch {
+        showToast('⚠ Serveur inaccessible.', 'warn');
+      } finally {
+        spinner.style.display = 'none';
+        btns.forEach(b => b.disabled = false);
+      }
+    }
+
+    /* ── Ripple ────────────────────────────────────────────── */
+    function addRipple(btn, ev) {
+      const rect = btn.getBoundingClientRect();
+      const el   = document.createElement('span');
+      el.className  = 'ripple-el';
+      el.style.left = (ev.clientX - rect.left) + 'px';
+      el.style.top  = (ev.clientY - rect.top)  + 'px';
+      btn.appendChild(el);
+      setTimeout(() => el.remove(), 600);
+    }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      document.getElementById('t-icon').textContent = type === 'warn' ? '▲' : '●';
+      document.getElementById('t-msg').textContent  = msg;
+      toast.className = 'show ' + type;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.className = toast.className.replace('show', '').trim();
+      }, 3600);
+    }
+  </script>
+</body>
+</html>
